@@ -14,7 +14,7 @@ c = get_config()  # noqa: F821
 c.JupyterHub.spawner_class = "dockerspawner.DockerSpawner"
 
 # Spawn containers from this image
-c.DockerSpawner.image = os.environ["DOCKER_NOTEBOOK_IMAGE"]
+c.DockerSpawner.allowed_images = os.environ.get("DOCKER_LAB_IMAGE", '').split(';')
 
 # JupyterHub requires a single-user instance of the Notebook server, so we
 # default to using the `start-singleuser.sh` script included in the
@@ -58,9 +58,38 @@ c.JupyterHub.db_url = "sqlite:////data/jupyterhub.sqlite"
 c.JupyterHub.authenticator_class = "nativeauthenticator.NativeAuthenticator"
 
 # Allow anyone to sign-up without approval
-c.NativeAuthenticator.open_signup = True
+c.NativeAuthenticator.open_signup = False
 
 # Allowed admins
 admin = os.environ.get("JUPYTERHUB_ADMIN")
 if admin:
     c.Authenticator.admin_users = [admin]
+
+
+### expand
+
+# notebook cpu in the container
+c.DockerSpawner.cpu_limit = float(os.environ.get("DOCKER_LAB_CPU", '1'))
+# notebook memory in the container
+c.DockerSpawner.mem_limit = os.environ.get("DOCKER_LAB_MEM", "4G")
+
+
+# Authenticator
+c.NativeAuthenticator.allowed_failed_logins = 3
+c.NativeAuthenticator.check_common_password = True
+c.NativeAuthenticator.minimum_password_length = 8
+
+# idle
+c.ServerApp.shutdown_no_activity_timeout = 60 * 60
+c.MappingKernelManager.cull_idle_timeout = 30 * 60
+c.MappingKernelManager.cull_interval = 5 * 60
+
+# env
+c.DockerSpawner.extra_create_kwargs = {'user': 'root'}
+c.DockerSpawner.extra_host_config = {'runtime': 'nvidia'}
+c.DockerSpawner.environment = {
+    'GRANT_SUDO': '1',
+    "JUPYTER_ENABLE_LAB": 'yes',
+    'UID': '0',
+    "NVIDIA_VISIBLE_DEVICES": os.environ.get("DOCKER_LAB_GPU", "")
+}
